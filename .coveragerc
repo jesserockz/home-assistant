@@ -278,6 +278,7 @@ omit =
     homeassistant/components/imap_email_content/sensor.py
     homeassistant/components/influxdb/sensor.py
     homeassistant/components/insteon/*
+    homeassistant/components/incomfort/*
     homeassistant/components/ios/*
     homeassistant/components/iota/*
     homeassistant/components/iperf3/*
@@ -349,6 +350,7 @@ omit =
     homeassistant/components/message_bird/notify.py
     homeassistant/components/met/weather.py
     homeassistant/components/meteo_france/*
+    homeassistant/components/meteoalarm/*
     homeassistant/components/metoffice/sensor.py
     homeassistant/components/metoffice/weather.py
     homeassistant/components/microsoft/tts.py
@@ -540,9 +542,7 @@ omit =
     homeassistant/components/smappee/*
     homeassistant/components/smtp/notify.py
     homeassistant/components/snapcast/media_player.py
-    homeassistant/components/snmp/device_tracker.py
-    homeassistant/components/snmp/sensor.py
-    homeassistant/components/snmp/switch.py
+    homeassistant/components/snmp/*
     homeassistant/components/sochain/sensor.py
     homeassistant/components/socialblade/sensor.py
     homeassistant/components/solaredge/sensor.py
