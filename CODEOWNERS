@@ -206,6 +206,7 @@ homeassistant/components/shiftr/* @fabaff
 homeassistant/components/shodan/* @fabaff
 homeassistant/components/simplisafe/* @bachya
 homeassistant/components/sma/* @kellerza
+homeassistant/components/smarthab/* @outadoc
 homeassistant/components/smartthings/* @andrewsayre
 homeassistant/components/smtp/* @fabaff
 homeassistant/components/sonos/* @amelchio
@@ -214,7 +215,7 @@ homeassistant/components/spider/* @peternijssen
 homeassistant/components/sql/* @dgomes
 homeassistant/components/statistics/* @fabaff
 homeassistant/components/stiebel_eltron/* @fucm
-homeassistant/components/sun/* @home-assistant/core
+homeassistant/components/sun/* @Swamp-Ig
 homeassistant/components/supla/* @mwegrzynek
 homeassistant/components/swiss_hydrological_data/* @fabaff
 homeassistant/components/swiss_public_transport/* @fabaff

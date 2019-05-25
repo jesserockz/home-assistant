@@ -770,7 +770,11 @@ async def async_process_component_config(
     This method must be run in the event loop.
     """
     domain = integration.domain
-    component = integration.get_component()
+    try:
+        component = integration.get_component()
+    except ImportError as ex:
+        _LOGGER.error("Unable to import %s: %s", domain, ex)
+        return None
 
     if hasattr(component, 'CONFIG_SCHEMA'):
         try:
@@ -823,12 +827,20 @@ async def async_process_component_config(
 
     # Create a copy of the configuration with all config for current
     # component removed and add validated config back in.
-    filter_keys = extract_domain_configs(config, domain)
-    config = {key: value for key, value in config.items()
-              if key not in filter_keys}
+    config = config_without_domain(config, domain)
     config[domain] = platforms
 
     return config
+
+
+@callback
+def config_without_domain(config: Dict, domain: str) -> Dict:
+    """Return a config with all configuration for a domain removed."""
+    filter_keys = extract_domain_configs(config, domain)
+    return {
+        key: value for key, value in config.items()
+        if key not in filter_keys
+    }
 
 
 async def async_check_ha_config_file(hass: HomeAssistant) -> Optional[str]:
