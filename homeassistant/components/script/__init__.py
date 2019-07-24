@@ -12,6 +12,7 @@ from homeassistant.loader import bind_hass
 from homeassistant.helpers.entity import ToggleEntity
 from homeassistant.helpers.entity_component import EntityComponent
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.config_validation import ENTITY_SERVICE_SCHEMA
 
 from homeassistant.helpers.script import Script
 
@@ -39,8 +40,7 @@ CONFIG_SCHEMA = vol.Schema({
 }, extra=vol.ALLOW_EXTRA)
 
 SCRIPT_SERVICE_SCHEMA = vol.Schema(dict)
-SCRIPT_TURN_ONOFF_SCHEMA = vol.Schema({
-    vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+SCRIPT_TURN_ONOFF_SCHEMA = ENTITY_SERVICE_SCHEMA.extend({
     vol.Optional(ATTR_VARIABLES): dict,
 })
 RELOAD_SERVICE_SCHEMA = vol.Schema({})
@@ -79,9 +79,14 @@ async def async_setup(hass, config):
     async def turn_off_service(service):
         """Cancel a script."""
         # Stopping a script is ok to be done in parallel
+        scripts = await component.async_extract_from_service(service)
+
+        if not scripts:
+            return
+
         await asyncio.wait([
             script.async_turn_off() for script
-            in await component.async_extract_from_service(service)
+            in scripts
         ])
 
     async def toggle_service(service):

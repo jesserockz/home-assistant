@@ -10,7 +10,7 @@ import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.const import (
-    CONF_NAME, CONF_MODE, CONF_MONITORED_CONDITIONS,
+    CONF_NAME, CONF_MODE,
     TEMP_CELSIUS, DEVICE_CLASS_HUMIDITY, DEVICE_CLASS_TEMPERATURE,
     DEVICE_CLASS_BATTERY)
 from homeassistant.helpers.entity import Entity
@@ -41,7 +41,7 @@ MIN_TIME_BETWEEN_UPDATES = timedelta(seconds=600)
 
 SUPPORTED_PUBLIC_SENSOR_TYPES = [
     'temperature', 'pressure', 'humidity', 'rain', 'windstrength',
-    'guststrength'
+    'guststrength', 'sum_rain_1', 'sum_rain_24'
 ]
 
 SENSOR_TYPES = {
@@ -72,21 +72,15 @@ SENSOR_TYPES = {
     'health_idx': ['Health', '', 'mdi:cloud', None],
 }
 
-MODULE_SCHEMA = vol.Schema({
-    vol.Required(cv.string): vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES)]),
-})
-
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_STATION): cv.string,
-    vol.Optional(CONF_MODULES): MODULE_SCHEMA,
+    vol.Optional(CONF_MODULES): vol.All(cv.ensure_list, [cv.string]),
     vol.Optional(CONF_AREAS): vol.All(cv.ensure_list, [
         {
             vol.Required(CONF_LAT_NE): cv.latitude,
             vol.Required(CONF_LAT_SW): cv.latitude,
             vol.Required(CONF_LON_NE): cv.longitude,
             vol.Required(CONF_LON_SW): cv.longitude,
-            vol.Required(CONF_MONITORED_CONDITIONS): [vol.In(
-                SUPPORTED_PUBLIC_SENSOR_TYPES)],
             vol.Optional(CONF_MODE, default=DEFAULT_MODE): vol.In(MODE_TYPES),
             vol.Optional(CONF_NAME, default=DEFAULT_NAME_PUBLIC): cv.string
         }
@@ -119,7 +113,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                 lat_sw=area[CONF_LAT_SW],
                 lon_sw=area[CONF_LON_SW]
             )
-            for sensor_type in area[CONF_MONITORED_CONDITIONS]:
+            for sensor_type in SUPPORTED_PUBLIC_SENSOR_TYPES:
                 dev.append(NetatmoPublicSensor(
                     area[CONF_NAME],
                     data,
@@ -127,6 +121,28 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
                     area[CONF_MODE]
                 ))
     else:
+        def find_devices(data):
+            """Find all devices."""
+            all_module_names = data.get_module_names()
+            module_names = config.get(CONF_MODULES, all_module_names)
+            _dev = []
+            for module_name in module_names:
+                if module_name not in all_module_names:
+                    _LOGGER.info("Module %s not found", module_name)
+                    continue
+                for condition in \
+                        data.station_data.monitoredConditions(module_name):
+                    _LOGGER.debug(
+                        "Adding %s %s",
+                        module_name,
+                        data.station_data.moduleByName(
+                            station=data.station, module=module_name
+                        )
+                    )
+                    _dev.append(NetatmoSensor(
+                        data, module_name, condition.lower(), data.station))
+            return _dev
+
         def _retry(_data):
             try:
                 _dev = find_devices(_data)
@@ -141,22 +157,12 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
             try:
                 data = NetatmoData(auth, data_class, config.get(CONF_STATION))
             except pyatmo.NoDevice:
-                _LOGGER.warning(
+                _LOGGER.info(
                     "No %s devices found",
                     NETATMO_DEVICE_TYPES[data_class.__name__]
                 )
                 continue
-            # Test if manually configured
-            if CONF_MODULES in config:
-                module_items = config[CONF_MODULES].items()
-                for module_name, monitored_conditions in module_items:
-                    for condition in monitored_conditions:
-                        dev.append(NetatmoSensor(
-                            data, module_name, condition.lower(),
-                            config.get(CONF_STATION)))
-                continue
 
-            # otherwise add all modules and conditions
             try:
                 dev.extend(find_devices(data))
             except requests.exceptions.Timeout:
@@ -165,17 +171,6 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
     if dev:
         add_entities(dev, True)
-
-
-def find_devices(data):
-    """Find all devices."""
-    dev = []
-    module_names = data.get_module_names()
-    for module_name in module_names:
-        for condition in data.station_data.monitoredConditions(module_name):
-            dev.append(NetatmoSensor(
-                data, module_name, condition.lower(), data.station))
-    return dev
 
 
 class NetatmoSensor(Entity):
@@ -254,7 +249,7 @@ class NetatmoSensor(Entity):
             elif self.type == 'rain':
                 self._state = data['Rain']
             elif self.type == 'sum_rain_1':
-                self._state = data['sum_rain_1']
+                self._state = round(data['sum_rain_1'], 1)
             elif self.type == 'sum_rain_24':
                 self._state = data['sum_rain_24']
             elif self.type == 'noise':
@@ -465,6 +460,10 @@ class NetatmoPublicSensor(Entity):
             data = self.netatmo_data.data.getLatestHumidities()
         elif self.type == 'rain':
             data = self.netatmo_data.data.getLatestRain()
+        elif self.type == 'sum_rain_1':
+            data = self.netatmo_data.data.get60minRain()
+        elif self.type == 'sum_rain_24':
+            data = self.netatmo_data.data.get24hRain()
         elif self.type == 'windstrength':
             data = self.netatmo_data.data.getLatestWindStrengths()
         elif self.type == 'guststrength':
@@ -476,10 +475,11 @@ class NetatmoPublicSensor(Entity):
             self._state = None
             return
 
+        values = [x for x in data.values() if x is not None]
         if self._mode == 'avg':
-            self._state = round(sum(data.values()) / len(data), 1)
+            self._state = round(sum(values) / len(values), 1)
         elif self._mode == 'max':
-            self._state = max(data.values())
+            self._state = max(values)
 
 
 class NetatmoPublicData:
@@ -527,6 +527,8 @@ class NetatmoData:
 
     def get_module_names(self):
         """Return all module available on the API as a list."""
+        if self.station is not None:
+            return self.station_data.modulesNamesList(station=self.station)
         return self.station_data.modulesNamesList()
 
     def update(self):

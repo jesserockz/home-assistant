@@ -12,6 +12,10 @@ from homeassistant.loader import bind_hass
 
 from .typing import HomeAssistantType
 
+
+# mypy: allow-incomplete-defs, allow-untyped-calls, allow-untyped-defs
+# mypy: no-check-untyped-defs, no-warn-return-any
+
 _LOGGER = logging.getLogger(__name__)
 _UNDEF = object()
 
@@ -136,12 +140,14 @@ class DeviceRegistry:
 
     @callback
     def async_update_device(
-            self, device_id, *, area_id=_UNDEF, name_by_user=_UNDEF,
-            new_identifiers=_UNDEF):
+            self, device_id, *, area_id=_UNDEF,
+            name=_UNDEF, name_by_user=_UNDEF,
+            new_identifiers=_UNDEF, via_device_id=_UNDEF):
         """Update properties of a device."""
         return self._async_update_device(
-            device_id, area_id=area_id, name_by_user=name_by_user,
-            new_identifiers=new_identifiers)
+            device_id, area_id=area_id,
+            name=name, name_by_user=name_by_user,
+            new_identifiers=new_identifiers, via_device_id=via_device_id)
 
     @callback
     def _async_update_device(self, device_id, *, add_config_entry_id=_UNDEF,

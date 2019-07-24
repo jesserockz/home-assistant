@@ -4,8 +4,10 @@ import datetime
 
 import voluptuous as vol
 
-from homeassistant.const import ATTR_ENTITY_ID, CONF_ICON, CONF_NAME
+from homeassistant.const import (
+    ATTR_DATE, ATTR_TIME, CONF_ICON, CONF_NAME)
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.config_validation import ENTITY_SERVICE_SCHEMA
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
@@ -22,15 +24,14 @@ CONF_INITIAL = 'initial'
 
 DEFAULT_VALUE = '1970-01-01 00:00:00'
 
-ATTR_DATE = 'date'
-ATTR_TIME = 'time'
+ATTR_DATETIME = 'datetime'
 
 SERVICE_SET_DATETIME = 'set_datetime'
 
-SERVICE_SET_DATETIME_SCHEMA = vol.Schema({
-    vol.Optional(ATTR_ENTITY_ID): cv.entity_ids,
+SERVICE_SET_DATETIME_SCHEMA = ENTITY_SERVICE_SCHEMA.extend({
     vol.Optional(ATTR_DATE): cv.date,
     vol.Optional(ATTR_TIME): cv.time,
+    vol.Optional(ATTR_DATETIME): cv.datetime,
 })
 
 
@@ -77,12 +78,19 @@ async def async_setup(hass, config):
         """Handle a call to the input datetime 'set datetime' service."""
         time = call.data.get(ATTR_TIME)
         date = call.data.get(ATTR_DATE)
-        if (entity.has_date and not date) or (entity.has_time and not time):
+        dttm = call.data.get(ATTR_DATETIME)
+        # pylint: disable=too-many-boolean-expressions
+        if (dttm and (date or time)
+                or entity.has_date and not (date or dttm)
+                or entity.has_time and not (time or dttm)):
             _LOGGER.error("Invalid service data for %s "
                           "input_datetime.set_datetime: %s",
                           entity.entity_id, str(call.data))
             return
 
+        if dttm:
+            date = dttm.date()
+            time = dttm.time()
         entity.async_set_datetime(date, time)
 
     component.async_register_entity_service(

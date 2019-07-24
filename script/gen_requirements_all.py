@@ -49,8 +49,10 @@ TEST_REQUIREMENTS = (
     'aioesphomeapi',
     'aiohttp_cors',
     'aiohue',
+    'aionotion',
     'aiounifi',
     'aioswitcher',
+    'aiowwlln',
     'apns2',
     'aprslib',
     'av',
@@ -130,6 +132,7 @@ TEST_REQUIREMENTS = (
     'pytradfri[async]',
     'pyunifi',
     'pyupnp-async',
+    'pyvesync',
     'pywebpush',
     'pyHS100',
     'PyNaCl',
@@ -146,6 +149,7 @@ TEST_REQUIREMENTS = (
     'srpenergy',
     'statsd',
     'toonapilib',
+    'twentemilieu',
     'uvcclient',
     'vsure',
     'warrant',
@@ -263,7 +267,7 @@ def gather_requirements_from_manifests(errors, reqs):
 
         if not integration.manifest:
             errors.append(
-                'The manifest for component {} is invalid.'.format(domain)
+                'The manifest for integration {} is invalid.'.format(domain)
             )
             continue
 

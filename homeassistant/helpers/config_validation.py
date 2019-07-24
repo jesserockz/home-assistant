@@ -20,12 +20,16 @@ from homeassistant.const import (
     CONF_ENTITY_NAMESPACE, CONF_PLATFORM, CONF_SCAN_INTERVAL,
     CONF_UNIT_SYSTEM_IMPERIAL, CONF_UNIT_SYSTEM_METRIC, CONF_VALUE_TEMPLATE,
     CONF_TIMEOUT, ENTITY_MATCH_ALL, SUN_EVENT_SUNRISE, SUN_EVENT_SUNSET,
-    TEMP_CELSIUS, TEMP_FAHRENHEIT, WEEKDAYS, __version__)
+    TEMP_CELSIUS, TEMP_FAHRENHEIT, WEEKDAYS, __version__, ATTR_AREA_ID,
+    ATTR_ENTITY_ID)
 from homeassistant.core import valid_entity_id, split_entity_id
 from homeassistant.exceptions import TemplateError
 from homeassistant.helpers.logging import KeywordStyleAdapter
 from homeassistant.util import slugify as util_slugify
 
+
+# mypy: allow-incomplete-defs, allow-untyped-calls, allow-untyped-defs
+# mypy: no-check-untyped-defs, no-warn-return-any
 # pylint: disable=invalid-name
 
 TIME_PERIOD_ERROR = "offset {} should be format 'HH:MM' or 'HH:MM:SS'"
@@ -91,7 +95,8 @@ def boolean(value: Any) -> bool:
         if value in ('0', 'false', 'no', 'off', 'disable'):
             return False
     elif isinstance(value, Number):
-        return value != 0
+        # type ignore: https://github.com/python/mypy/issues/3186
+        return value != 0  # type: ignore
     raise vol.Invalid('invalid boolean value {}'.format(value))
 
 
@@ -160,7 +165,7 @@ def isdir(value: Any) -> str:
     return dir_in
 
 
-def ensure_list(value: Union[T, Sequence[T]]) -> Sequence[T]:
+def ensure_list(value: Union[T, Sequence[T], None]) -> Sequence[T]:
     """Wrap value in list if it is not one."""
     if value is None:
         return []
@@ -549,7 +554,14 @@ def deprecated(key: str,
         - Once the invalidation_version is crossed, raises vol.Invalid if key
         is detected
     """
-    module_name = inspect.getmodule(inspect.stack()[1][0]).__name__
+    module = inspect.getmodule(inspect.stack()[1][0])
+    if module is not None:
+        module_name = module.__name__
+    else:
+        # Unclear when it is None, but it happens, so let's guard.
+        # https://github.com/home-assistant/home-assistant/issues/24982
+        # type ignore/unreachable: https://github.com/python/typeshed/pull/3137
+        module_name = __name__  # type: ignore
 
     if replacement_key and invalidation_version:
         warning = ("The '{key}' option (with value '{value}') is"
@@ -599,13 +611,15 @@ def deprecated(key: str,
                 config.pop(key)
         else:
             value = default
-        if (replacement_key
-                and (replacement_key not in config
-                     or default == config.get(replacement_key))
-                and value is not None):
-            config[replacement_key] = value
+        keys = [key]
+        if replacement_key:
+            keys.append(replacement_key)
+            if value is not None and (
+                    replacement_key not in config or
+                    default == config.get(replacement_key)):
+                config[replacement_key] = value
 
-        return has_at_most_one_key(key, replacement_key)(config)
+        return has_at_most_one_key(*keys)(config)
 
     return validator
 
@@ -635,6 +649,11 @@ PLATFORM_SCHEMA = vol.Schema({
 
 PLATFORM_SCHEMA_BASE = PLATFORM_SCHEMA.extend({
 }, extra=vol.ALLOW_EXTRA)
+
+ENTITY_SERVICE_SCHEMA = vol.Schema({
+    vol.Optional(ATTR_ENTITY_ID): comp_entity_ids,
+    vol.Optional(ATTR_AREA_ID): vol.All(ensure_list, [str]),
+})
 
 EVENT_SCHEMA = vol.Schema({
     vol.Optional(CONF_ALIAS): string,
@@ -727,7 +746,7 @@ CONDITION_SCHEMA = vol.Any(
     ZONE_CONDITION_SCHEMA,
     AND_CONDITION_SCHEMA,
     OR_CONDITION_SCHEMA,
-)
+)  # type: vol.Schema
 
 _SCRIPT_DELAY_SCHEMA = vol.Schema({
     vol.Optional(CONF_ALIAS): string,

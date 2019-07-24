@@ -14,11 +14,12 @@ from homeassistant.core import Context, CoreState
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import condition, extract_domain_configs, script
 import homeassistant.helpers.config_validation as cv
+from homeassistant.helpers.config_validation import ENTITY_SERVICE_SCHEMA
 from homeassistant.helpers.entity import ToggleEntity
 from homeassistant.helpers.entity_component import EntityComponent
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.loader import bind_hass
-from homeassistant.util.dt import utcnow
+from homeassistant.util.dt import parse_datetime, utcnow
 
 DOMAIN = 'automation'
 ENTITY_ID_FORMAT = DOMAIN + '.{}'
@@ -85,12 +86,7 @@ PLATFORM_SCHEMA = vol.Schema({
     vol.Required(CONF_ACTION): cv.SCRIPT_SCHEMA,
 })
 
-SERVICE_SCHEMA = vol.Schema({
-    vol.Optional(ATTR_ENTITY_ID): cv.comp_entity_ids,
-})
-
-TRIGGER_SERVICE_SCHEMA = vol.Schema({
-    vol.Required(ATTR_ENTITY_ID): cv.comp_entity_ids,
+TRIGGER_SERVICE_SCHEMA = ENTITY_SERVICE_SCHEMA.extend({
     vol.Optional(ATTR_VARIABLES, default={}): dict,
 })
 
@@ -165,12 +161,12 @@ async def async_setup(hass, config):
 
     hass.services.async_register(
         DOMAIN, SERVICE_TOGGLE, toggle_service_handler,
-        schema=SERVICE_SCHEMA)
+        schema=ENTITY_SERVICE_SCHEMA)
 
     for service in (SERVICE_TURN_ON, SERVICE_TURN_OFF):
         hass.services.async_register(
             DOMAIN, service, turn_onoff_service_handler,
-            schema=SERVICE_SCHEMA)
+            schema=ENTITY_SERVICE_SCHEMA)
 
     return True
 
@@ -227,7 +223,9 @@ class AutomationEntity(ToggleEntity, RestoreEntity):
         state = await self.async_get_last_state()
         if state:
             enable_automation = state.state == STATE_ON
-            self._last_triggered = state.attributes.get('last_triggered')
+            last_triggered = state.attributes.get('last_triggered')
+            if last_triggered is not None:
+                self._last_triggered = parse_datetime(last_triggered)
             _LOGGER.debug("Loaded automation %s with state %s from state "
                           " storage last state %s", self.entity_id,
                           enable_automation, state)

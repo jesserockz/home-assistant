@@ -3,7 +3,9 @@ import asyncio
 import logging
 import functools
 import uuid
-from typing import Callable, List, Optional, Set  # noqa pylint: disable=unused-import
+from typing import (
+    Any, Callable, List, Optional, Set  # noqa pylint: disable=unused-import
+)
 import weakref
 
 from homeassistant import data_entry_flow, loader
@@ -121,11 +123,13 @@ class ConfigEntry:
         self.update_listeners = []  # type: list
 
         # Function to cancel a scheduled retry
-        self._async_cancel_retry_setup = None
+        self._async_cancel_retry_setup = \
+            None  # type: Optional[Callable[[], Any]]
 
     async def async_setup(
             self, hass: HomeAssistant, *,
-            integration: Optional[loader.Integration] = None, tries=0) -> None:
+            integration: Optional[loader.Integration] = None, tries: int = 0) \
+            -> None:
         """Set up an entry."""
         if integration is None:
             integration = await loader.async_get_integration(hass, self.domain)
@@ -187,7 +191,9 @@ class ConfigEntry:
         else:
             self.state = ENTRY_STATE_SETUP_ERROR
 
-    async def async_unload(self, hass, *, integration=None) -> bool:
+    async def async_unload(
+            self, hass: HomeAssistant, *,
+            integration: Optional[loader.Integration] = None) -> bool:
         """Unload an entry.
 
         Returns if unload is possible and was successful.
@@ -217,7 +223,8 @@ class ConfigEntry:
             return False
 
         try:
-            result = await component.async_unload_entry(hass, self)
+            result = await component.async_unload_entry(  # type: ignore
+                hass, self)
 
             assert isinstance(result, bool)
 
@@ -257,8 +264,7 @@ class ConfigEntry:
                           self.title, self.domain)
             return False
         # Handler may be a partial
-        # type ignore: https://github.com/python/typeshed/pull/3077
-        while isinstance(handler, functools.partial):  # type: ignore
+        while isinstance(handler, functools.partial):
             handler = handler.func
 
         if self.version == handler.VERSION:
@@ -552,14 +558,6 @@ class ConfigEntries:
                 self.hass, handler_key)
         except loader.IntegrationNotFound:
             _LOGGER.error('Cannot find integration %s', handler_key)
-            raise data_entry_flow.UnknownHandler
-
-        # Our config flow list is based on built-in integrations. If overriden,
-        # we should not load it's config flow.
-        if not integration.is_built_in:
-            _LOGGER.error(
-                'Config flow is not supported for custom integration %s',
-                handler_key)
             raise data_entry_flow.UnknownHandler
 
         # Make sure requirements and dependencies of component are resolved

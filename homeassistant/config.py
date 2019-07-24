@@ -30,6 +30,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.loader import (
     Integration, async_get_integration, IntegrationNotFound
 )
+from homeassistant.requirements import async_process_requirements
 from homeassistant.util.yaml import load_yaml, SECRET_YAML
 from homeassistant.util.package import is_docker_env
 import homeassistant.helpers.config_validation as cv
@@ -522,7 +523,7 @@ async def async_process_ha_core_config(
 def _log_pkg_error(
         package: str, component: str, config: Dict, message: str) -> None:
     """Log an error while merging packages."""
-    message = "Package {} setup failed. Component {} {}".format(
+    message = "Package {} setup failed. Integration {} {}".format(
         package, component, message)
 
     pack_config = config[CONF_CORE][CONF_PACKAGES].get(package, config)
@@ -573,7 +574,7 @@ def _recursive_merge(
 
 
 async def merge_packages_config(hass: HomeAssistant, config: Dict,
-                                packages: Dict,
+                                packages: Dict[str, Any],
                                 _log_pkg_error: Callable = _log_pkg_error) \
         -> Dict:
     """Merge packages into the top-level configuration. Mutate config."""
@@ -591,6 +592,13 @@ async def merge_packages_config(hass: HomeAssistant, config: Dict,
                 integration = await async_get_integration(hass, domain)
             except IntegrationNotFound:
                 _log_pkg_error(pack_name, comp_name, config, "does not exist")
+                continue
+
+            if (not hass.config.skip_pip and integration.requirements and
+                    not await async_process_requirements(
+                        hass, integration.domain, integration.requirements)):
+                _log_pkg_error(pack_name, comp_name, config,
+                               "unable to install all requirements")
                 continue
 
             try:
@@ -633,11 +641,6 @@ async def merge_packages_config(hass: HomeAssistant, config: Dict,
                 _log_pkg_error(
                     pack_name, comp_name, config,
                     "cannot be merged. Dict expected in main config.")
-                continue
-            if not isinstance(comp_conf, dict):
-                _log_pkg_error(
-                    pack_name, comp_name, config,
-                    "cannot be merged. Dict expected in package.")
                 continue
 
             error = _recursive_merge(conf=config[comp_name],
@@ -697,8 +700,17 @@ async def async_process_component_config(
 
         try:
             p_integration = await async_get_integration(hass, p_name)
+        except IntegrationNotFound:
+            continue
+
+        if (not hass.config.skip_pip and p_integration.requirements and
+                not await async_process_requirements(
+                    hass, p_integration.domain, p_integration.requirements)):
+            continue
+
+        try:
             platform = p_integration.get_platform(domain)
-        except (IntegrationNotFound, ImportError):
+        except ImportError:
             continue
 
         # Validate platform specific schema
@@ -737,13 +749,13 @@ async def async_check_ha_config_file(hass: HomeAssistant) -> Optional[str]:
 
     This method is a coroutine.
     """
-    from homeassistant.scripts.check_config import check_ha_config_file
+    import homeassistant.helpers.check_config as check_config
 
-    res = await check_ha_config_file(hass)  # type: ignore
+    res = await check_config.async_check_ha_config_file(hass)
 
     if not res.errors:
         return None
-    return '\n'.join([err.message for err in res.errors])
+    return res.error_str
 
 
 @callback
