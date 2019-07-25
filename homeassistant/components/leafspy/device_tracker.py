@@ -8,9 +8,9 @@ from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
 )
 from homeassistant.components.device_tracker.const import (
-    ENTITY_ID_FORMAT, ATTR_SOURCE_TYPE, SOURCE_TYPE_GPS)
+    ENTITY_ID_FORMAT, SOURCE_TYPE_GPS)
 from homeassistant.components.device_tracker.config_entry import (
-    DeviceTrackerEntity
+    TrackerEntity
 )
 from homeassistant.util import slugify
 from homeassistant.helpers.restore_state import RestoreEntity
@@ -60,7 +60,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
     }
 
     if not dev_ids:
-        return True
+        return
 
     entities = []
     for dev_id in dev_ids:
@@ -71,10 +71,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
 
     async_add_entities(entities)
 
-    return True
 
-
-class LeafSpyEntity(DeviceTrackerEntity, RestoreEntity):
+class LeafSpyEntity(TrackerEntity, RestoreEntity):
     """Represent a tracked car."""
 
     def __init__(self, dev_id, data=None):
@@ -91,7 +89,7 @@ class LeafSpyEntity(DeviceTrackerEntity, RestoreEntity):
     @property
     def battery_level(self):
         """Return the battery level of the car."""
-        return self._data.get('battery')
+        return self._data.get('battery_level')
 
     @property
     def device_state_attributes(self):
@@ -101,25 +99,17 @@ class LeafSpyEntity(DeviceTrackerEntity, RestoreEntity):
     @property
     def latitude(self):
         """Return latitude value of the car."""
-        # Check with "get" instead of "in" because value can be None
-        if self._data.get('gps'):
-            return self._data['gps'][0]
-
-        return None
+        return self._data.get('latitude')
 
     @property
     def longitude(self):
         """Return longitude value of the car."""
-        # Check with "get" instead of "in" because value can be None
-        if self._data.get('gps'):
-            return self._data['gps'][1]
-
-        return None
+        return self._data.get('longitude')
 
     @property
     def name(self):
         """Return the name of the car."""
-        return self._data.get('host_name')
+        return self._data.get('device_name')
 
     @property
     def should_poll(self):
@@ -154,10 +144,12 @@ class LeafSpyEntity(DeviceTrackerEntity, RestoreEntity):
 
         attr = state.attributes
         self._data = {
-            'host_name': state.name,
-            'gps': (attr.get(ATTR_LATITUDE), attr.get(ATTR_LONGITUDE)),
-            'battery': attr.get(ATTR_BATTERY_LEVEL),
-            'source_type': attr.get(ATTR_SOURCE_TYPE),
+            'device_name': state.name,
+            'latitude': attr.get(ATTR_LATITUDE),
+            'longitude': attr.get(ATTR_LONGITUDE),
+            'battery_level': attr.get(ATTR_BATTERY_LEVEL),
+            'attributes': attr
+
         }
 
     @callback
@@ -172,9 +164,10 @@ def _parse_see_args(message):
     dev_id = slugify('leaf_{}'.format(message['VIN']))
     args = {
         'dev_id': dev_id,
-        'host_name': message['user'],
-        'gps': (float(message['Lat']), float(message['Long'])),
-        'battery': float(message['SOC']),
+        'device_name': message['user'],
+        'latitude': float(message['Lat']),
+        'longitude': float(message['Long']),
+        'battery_level': float(message['SOC']),
         'attributes': {
             'amp_hours': float(message['AHr']),
             'trip': int(message['Trip']),
@@ -190,8 +183,7 @@ def _parse_see_args(message):
             'rpm': int(message['RPM']),
             'gids': int(message['Gids']),
             'elevation': int(message['Elv']),
-            'sequence': int(message['Seq']),
-            ATTR_SOURCE_TYPE: SOURCE_TYPE_GPS
+            'sequence': int(message['Seq'])
         }
     }
 

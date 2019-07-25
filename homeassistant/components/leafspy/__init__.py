@@ -92,7 +92,6 @@ class LeafSpyView(HomeAssistantView):
 
         try:
             message = request.query
-
             if not hmac.compare_digest(message['pass'], context.secret):
                 raise Exception("Invalid password")
 
@@ -102,4 +101,4 @@ class LeafSpyView(HomeAssistantView):
             return Response(status=200, text='"status":"0"')
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Error processing leafspy webhook")
-            return Response(status=200, text="")
+            return Response(status=500, text="")
