@@ -60,6 +60,7 @@ FLOWS = [
     "ipp",
     "iqvia",
     "izone",
+    "juicenet",
     "konnected",
     "life360",
     "lifx",
